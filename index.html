@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PassForge — Password Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #1a1a1a;
+    --border: #2a2a2a;
+    --border2: #3a3a3a;
+    --text: #e8e4d9;
+    --text2: #888880;
+    --text3: #555550;
+    --accent: #c8f060;
+    --accent2: #8cb840;
+    --accent-dim: rgba(200,240,96,0.08);
+    --red: #ff5f5f;
+    --amber: #ffb347;
+    --yellow: #ffd060;
+    --green: #c8f060;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.07) 2px,
+      rgba(0,0,0,0.07) 4px
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 560px;
+  }
+
+  /* Header */
+  .header {
+    margin-bottom: 2rem;
+  }
+  .header-top {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .logo {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+  }
+  .version {
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .tagline {
+    font-size: 12px;
+    color: var(--text3);
+    font-family: var(--sans);
+    font-weight: 300;
+    letter-spacing: 0.5px;
+  }
+
+  /* Password display */
+  .pw-box {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 1.25rem 1.25rem 1rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+  }
+  .pw-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+  .pw-output {
+    font-size: clamp(14px, 3vw, 18px);
+    font-weight: 400;
+    color: var(--accent);
+    word-break: break-all;
+    line-height: 1.6;
+    min-height: 2.4em;
+    letter-spacing: 0.5px;
+    transition: opacity 0.1s;
+  }
+  .pw-output.flash { opacity: 0.2; }
+
+  .pw-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    border-radius: 3px;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text2);
+    transition: all 0.15s;
+  }
+  .btn:hover { border-color: var(--accent2); color: var(--accent); }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: var(--accent);
+    color: #0a0a0a;
+    border-color: var(--accent);
+    font-weight: 600;
+    flex: 1;
+  }
+  .btn-primary:hover { background: #d4f570; color: #000; border-color: #d4f570; }
+  .btn-copy.copied { border-color: var(--green); color: var(--green); }
+
+  /* Strength meter */
+  .strength-section {
+    margin-bottom: 1.5rem;
+  }
+  .strength-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .strength-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text3);
+  }
+  .strength-name {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: color 0.3s;
+  }
+  .strength-bar-track {
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .strength-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s cubic-bezier(0.4,0,0.2,1), background 0.3s;
+  }
+  .strength-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 10px;
+  }
+  .stat-label {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 4px;
+    font-family: var(--sans);
+  }
+  .stat-value {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  /* Crack time */
+  .crack-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+  .crack-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text3);
+    font-family: var(--sans);
+  }
+  .crack-value {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /* Options */
+  .options-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .option-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+  }
+  .option-row:last-child { border-bottom: none; }
+  .option-left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .option-name {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 400;
+  }
+  .option-sample {
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 1px;
+  }
+
+  /* Toggle */
+  .toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .toggle-slider::after {
+    content: '';
+    position: absolute;
+    left: 2px; top: 2px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--text3);
+    transition: all 0.2s;
+  }
+  .toggle input:checked + .toggle-slider { background: var(--accent-dim); border-color: var(--accent2); }
+  .toggle input:checked + .toggle-slider::after { transform: translateX(16px); background: var(--accent); }
+
+  /* Length slider */
+  .length-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+  }
+  .length-label { font-size: 13px; color: var(--text); white-space: nowrap; }
+  .length-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--accent);
+    min-width: 36px;
+    text-align: right;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    flex: 1;
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    border: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+  /* Char class indicators */
+  .char-indicators {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+  .char-pill {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    border: 1px solid var(--border2);
+    color: var(--text3);
+    font-family: var(--sans);
+    transition: all 0.2s;
+  }
+  .char-pill.active { border-color: var(--accent2); color: var(--accent); background: var(--accent-dim); }
+
+  /* Footer */
+  .footer {
+    margin-top: 1.5rem;
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 1px;
+    font-family: var(--sans);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <div class="header-top">
+      <span class="logo">PassForge</span>
+      <span class="version">v1.0</span>
+    </div>
+    <p class="tagline">Password generator &amp; strength analyzer</p>
+  </div>
+
+  <!-- Password Output -->
+  <div class="pw-box">
+    <div class="pw-label">Generated Password</div>
+    <div class="pw-output" id="pw-output">—</div>
+    <div class="pw-actions">
+      <button class="btn btn-copy" id="btn-copy" onclick="copyPassword()">Copy</button>
+      <button class="btn btn-primary" onclick="generate()">↻ Generate</button>
+    </div>
+  </div>
+
+  <!-- Strength -->
+  <div class="strength-section">
+    <div class="strength-header">
+      <span class="strength-label">Strength</span>
+      <span class="strength-name" id="strength-name">—</span>
+    </div>
+    <div class="strength-bar-track">
+      <div class="strength-bar-fill" id="strength-bar" style="width:0%"></div>
+    </div>
+    <div class="strength-stats">
+      <div class="stat-card">
+        <div class="stat-label">Entropy</div>
+        <div class="stat-value" id="stat-entropy">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Charset</div>
+        <div class="stat-value" id="stat-charset">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Panjang</div>
+        <div class="stat-value" id="stat-length">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Crack time -->
+  <div class="crack-row">
+    <span class="crack-label">Estimasi waktu crack</span>
+    <span class="crack-value" id="crack-time">—</span>
+  </div>
+
+  <!-- Options -->
+  <div class="options-section">
+    <div class="length-row">
+      <span class="length-label">Panjang</span>
+      <input type="range" id="length-slider" min="6" max="64" value="20" oninput="onLengthChange(this.value)">
+      <span class="length-value" id="length-display">20</span>
+    </div>
+
+    <div class="option-row">
+      <div class="option-left">
+        <span class="option-name">Huruf besar</span>
+        <span class="option-sample">A B C … Z</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="opt-upper" checked onchange="generate()"><span class="toggle-slider"></span></label>
+    </div>
+
+    <div class="option-row">
+      <div class="option-left">
+        <span class="option-name">Huruf kecil</span>
+        <span class="option-sample">a b c … z</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="opt-lower" checked onchange="generate()"><span class="toggle-slider"></span></label>
+    </div>
+
+    <div class="option-row">
+      <div class="option-left">
+        <span class="option-name">Angka</span>
+        <span class="option-sample">0 1 2 … 9</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="opt-numbers" checked onchange="generate()"><span class="toggle-slider"></span></label>
+    </div>
+
+    <div class="option-row">
+      <div class="option-left">
+        <span class="option-name">Simbol</span>
+        <span class="option-sample">! @ # $ % ^ &amp; *</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="opt-symbols" onchange="generate()"><span class="toggle-slider"></span></label>
+    </div>
+
+    <div class="option-row">
+      <div class="option-left">
+        <span class="option-name">Tanpa karakter ambigu</span>
+        <span class="option-sample">exclude: 0 O l I 1</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="opt-noambig" onchange="generate()"><span class="toggle-slider"></span></label>
+    </div>
+
+    <div class="char-indicators">
+      <span class="char-pill" id="pill-upper">UPPER</span>
+      <span class="char-pill" id="pill-lower">lower</span>
+      <span class="char-pill" id="pill-numbers">0-9</span>
+      <span class="char-pill" id="pill-symbols">!@#</span>
+    </div>
+  </div>
+
+  <div class="footer">Generated securely in browser — tidak dikirim ke server manapun</div>
+</div>
+
+<script>
+const CHARS = {
+  upper:   'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  lower:   'abcdefghijklmnopqrstuvwxyz',
+  numbers: '0123456789',
+  symbols: '!@#$%^&*()-_=+[]{}|;:,.<>?',
+};
+const AMBIG = /[0OlI1]/g;
+
+function buildCharset() {
+  const upper   = document.getElementById('opt-upper').checked;
+  const lower   = document.getElementById('opt-lower').checked;
+  const numbers = document.getElementById('opt-numbers').checked;
+  const symbols = document.getElementById('opt-symbols').checked;
+  const noambig = document.getElementById('opt-noambig').checked;
+
+  let cs = '';
+  if (upper)   cs += CHARS.upper;
+  if (lower)   cs += CHARS.lower;
+  if (numbers) cs += CHARS.numbers;
+  if (symbols) cs += CHARS.symbols;
+  if (noambig) cs = cs.replace(AMBIG, '');
+
+  // update pills
+  document.getElementById('pill-upper').classList.toggle('active', upper);
+  document.getElementById('pill-lower').classList.toggle('active', lower);
+  document.getElementById('pill-numbers').classList.toggle('active', numbers);
+  document.getElementById('pill-symbols').classList.toggle('active', symbols);
+
+  return cs || CHARS.lower; // fallback
+}
+
+function generatePassword(len, charset) {
+  const arr = new Uint32Array(len);
+  crypto.getRandomValues(arr);
+  let pw = '';
+  for (let i = 0; i < len; i++) pw += charset[arr[i] % charset.length];
+  return pw;
+}
+
+function calcEntropy(len, charsetSize) {
+  return Math.floor(len * Math.log2(charsetSize));
+}
+
+function crackTime(entropy) {
+  // Assume 10^12 guesses/sec (modern GPU cluster)
+  const guesses = Math.pow(2, entropy);
+  const seconds = guesses / 1e12;
+  if (seconds < 1)        return '< 1 detik';
+  if (seconds < 60)       return Math.round(seconds) + ' detik';
+  if (seconds < 3600)     return Math.round(seconds/60) + ' menit';
+  if (seconds < 86400)    return Math.round(seconds/3600) + ' jam';
+  if (seconds < 2592000)  return Math.round(seconds/86400) + ' hari';
+  if (seconds < 31536000) return Math.round(seconds/2592000) + ' bulan';
+  const years = seconds / 31536000;
+  if (years < 1e6)  return years.toExponential(1) + ' tahun';
+  if (years < 1e12) return years.toExponential(1) + ' tahun';
+  return '> ' + years.toExponential(0) + ' tahun';
+}
+
+function strengthInfo(entropy) {
+  if (entropy < 28) return { name: 'Sangat Lemah', pct: 8,  color: '#ff5f5f' };
+  if (entropy < 40) return { name: 'Lemah',        pct: 25, color: '#ff5f5f' };
+  if (entropy < 56) return { name: 'Sedang',       pct: 50, color: '#ffb347' };
+  if (entropy < 72) return { name: 'Kuat',         pct: 72, color: '#ffd060' };
+  if (entropy < 90) return { name: 'Sangat Kuat',  pct: 88, color: '#c8f060' };
+  return               { name: 'Ekstrem',          pct: 100, color: '#c8f060' };
+}
+
+function generate() {
+  const len     = parseInt(document.getElementById('length-slider').value);
+  const charset = buildCharset();
+  const pw      = generatePassword(len, charset);
+  const entropy = calcEntropy(len, charset.length);
+  const si      = strengthInfo(entropy);
+
+  // Flash
+  const out = document.getElementById('pw-output');
+  out.classList.add('flash');
+  setTimeout(() => { out.textContent = pw; out.classList.remove('flash'); }, 80);
+
+  // Strength
+  document.getElementById('strength-bar').style.width   = si.pct + '%';
+  document.getElementById('strength-bar').style.background = si.color;
+  document.getElementById('strength-name').textContent  = si.name;
+  document.getElementById('strength-name').style.color  = si.color;
+
+  // Stats
+  document.getElementById('stat-entropy').textContent = entropy + ' bit';
+  document.getElementById('stat-charset').textContent = charset.length;
+  document.getElementById('stat-length').textContent  = len + ' char';
+  document.getElementById('crack-time').textContent   = crackTime(entropy);
+}
+
+function onLengthChange(val) {
+  document.getElementById('length-display').textContent = val;
+  generate();
+}
+
+async function copyPassword() {
+  const pw = document.getElementById('pw-output').textContent;
+  if (!pw || pw === '—') return;
+  try {
+    await navigator.clipboard.writeText(pw);
+    const btn = document.getElementById('btn-copy');
+    btn.textContent = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1800);
+  } catch {
+    // fallback select
+    const r = document.createRange();
+    r.selectNode(document.getElementById('pw-output'));
+    window.getSelection().addRange(r);
+  }
+}
+
+// Generate on load
+generate();
+</script>
+</body>
+</html>
